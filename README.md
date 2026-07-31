@@ -8,7 +8,7 @@ evidence through read-only tools, then either issues a refund or files a
 human-review escalation. **Every policy decision is made and enforced by this
 server, not by the AI client.**
 
-- **Hosted MCP endpoint:** `<DEPLOYED_URL>/mcp` _(pending deployment)_
+- **Hosted MCP endpoint:** `https://commerce-ops-mcp-production-c298.up.railway.app/mcp`
 - **Source:** https://github.com/7vignesh/commerce-ops-mcp
 
 ---
@@ -183,17 +183,32 @@ curl http://localhost:3000/health
 ### Connecting an MCP client
 
 Transport is Streamable HTTP at `POST /mcp`. For a client that reads a config
-file:
+file, pointing at the hosted server:
 
 ```json
 {
   "mcpServers": {
     "commerce-ops": {
-      "url": "http://localhost:3000/mcp"
+      "url": "https://commerce-ops-mcp-production-c298.up.railway.app/mcp"
     }
   }
 }
 ```
+
+Substitute `http://localhost:3000/mcp` to run against a local instance.
+
+### Deployment note
+
+The database host must be reachable over IPv4. Supabase's direct connection
+hostname (`db.<ref>.supabase.co`) resolves to IPv6 only, and Railway containers
+have no IPv6 egress — the connection hangs rather than failing cleanly. Use the
+**connection pooler** host (`aws-0-<region>.pooler.supabase.com`), which has
+IPv4 records. Note the pooler username is `postgres.<project-ref>` rather than
+`postgres`.
+
+If the database is unreachable the server still binds its port and `/health`
+returns `503` with the underlying error, so the cause is visible rather than
+surfacing as a generic platform 502.
 
 ---
 
