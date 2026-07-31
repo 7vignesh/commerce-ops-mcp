@@ -86,6 +86,9 @@ interface OrderSeed {
   customerId: string;
   status: string;
   daysAgo: number;
+  // Pins the line items so a scenario can target an exact total. Used by the
+  // demo orders that need to sit either side of the $150 refund cap.
+  items?: { name: string; quantity: number; price: number }[];
 }
 
 // Orders designed to cover the missing-delivery workflow well
@@ -114,13 +117,23 @@ const orderSeeds: OrderSeed[] = [
   { id: "ORD-1017", customerId: "cust_015", status: "shipped", daysAgo: 6 },
   { id: "ORD-1018", customerId: "cust_017", status: "shipped", daysAgo: 4 },
 
-  // Shipped — LOST (key scenario for missing-delivery workflow) (6)
-  { id: "ORD-1019", customerId: "cust_001", status: "shipped", daysAgo: 10 },  // Low risk, eligible for refund
-  { id: "ORD-1020", customerId: "cust_005", status: "shipped", daysAgo: 8 },   // Low risk, eligible
-  { id: "ORD-1021", customerId: "cust_006", status: "shipped", daysAgo: 12 },  // HIGH risk (72) — should escalate
-  { id: "ORD-1022", customerId: "cust_014", status: "shipped", daysAgo: 9 },   // HIGH risk (78) — should escalate
-  { id: "ORD-1023", customerId: "cust_019", status: "shipped", daysAgo: 7 },   // Low risk, eligible
-  { id: "ORD-1024", customerId: "cust_020", status: "shipped", daysAgo: 35 },  // Low risk BUT >30 days — should escalate
+  // Shipped — LOST (key scenario for missing-delivery workflow) (7)
+  // Each of these isolates a single refund-eligibility outcome so the workflow
+  // can be demonstrated one policy rule at a time.
+  { id: "ORD-1019", customerId: "cust_001", status: "shipped", daysAgo: 10 },  // risk 15, 10d, $98.95 — fully eligible
+  { id: "ORD-1020", customerId: "cust_005", status: "shipped", daysAgo: 8 },   // risk 5,  8d  — fully eligible
+  { id: "ORD-1021", customerId: "cust_006", status: "shipped", daysAgo: 12 },  // risk 72 — fails risk only
+  { id: "ORD-1022", customerId: "cust_014", status: "shipped", daysAgo: 9 },   // risk 78 — fails risk only
+  { id: "ORD-1023", customerId: "cust_019", status: "shipped", daysAgo: 7 },   // risk 9,  7d  — fully eligible
+  { id: "ORD-1024", customerId: "cust_013", status: "shipped", daysAgo: 35 },  // risk 12, 35d — fails age only
+  // risk 18, 6d, $229.98 — fails the $150 cap only
+  {
+    id: "ORD-1051",
+    customerId: "cust_015",
+    status: "shipped",
+    daysAgo: 6,
+    items: [{ name: "Kitchen Knife Set", quantity: 2, price: 114.99 }],
+  },
 
   // Shipped — RETURNED (2)
   { id: "ORD-1025", customerId: "cust_003", status: "shipped", daysAgo: 11 },
@@ -160,7 +173,7 @@ const orderSeeds: OrderSeed[] = [
 ];
 
 // Track which orders should have "lost" or "returned" shipments
-const lostOrderIds = new Set(["ORD-1019", "ORD-1020", "ORD-1021", "ORD-1022", "ORD-1023", "ORD-1024"]);
+const lostOrderIds = new Set(["ORD-1019", "ORD-1020", "ORD-1021", "ORD-1022", "ORD-1023", "ORD-1024", "ORD-1051"]);
 const returnedOrderIds = new Set(["ORD-1025", "ORD-1026"]);
 
 export async function seed(): Promise<void> {
@@ -180,7 +193,7 @@ export async function seed(): Promise<void> {
 
     // Insert orders, payments, shipments
     for (const orderSeed of orderSeeds) {
-      const items = randomItems();
+      const items = orderSeed.items ?? randomItems();
       const totalAmount = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
       const createdAt = daysAgo(orderSeed.daysAgo);
       const updatedAt = daysAgo(Math.max(0, orderSeed.daysAgo - 1));
