@@ -15,7 +15,21 @@ import { reshipOrder, reshipOrderSchema } from "./tools/reship-order.js";
 import { escalateToHuman, escalateToHumanSchema } from "./tools/escalate-to-human.js";
 
 // Initialize database
-await initializeDatabase();
+// Deliberately not awaited at module scope: if the database is unreachable the
+// process must still bind a port, otherwise the platform healthcheck sees a
+// dead container and reports a generic 502 instead of the real cause.
+let dbReady = false;
+let dbError: string | null = null;
+
+const dbInit = initializeDatabase()
+  .then(() => {
+    dbReady = true;
+    console.log("database ready");
+  })
+  .catch((err) => {
+    dbError = err instanceof Error ? err.message : String(err);
+    console.error("database initialization failed:", dbError);
+  });
 
 function createMcpServer(): McpServer {
   const server = new McpServer({
@@ -136,11 +150,25 @@ const transports = new Map<string, StreamableHTTPServerTransport>();
 
 // Health check
 app.get("/health", (_req, res) => {
-  res.json({ status: "ok", server: "commerce-ops-mcp", version: "1.0.0" });
+  res.status(dbReady ? 200 : 503).json({
+    status: dbReady ? "ok" : "degraded",
+    server: "commerce-ops-mcp",
+    version: "1.0.0",
+    database: dbReady ? "connected" : "unavailable",
+    ...(dbError ? { databaseError: dbError } : {}),
+  });
 });
 
 // MCP Streamable HTTP endpoint
 app.post("/mcp", async (req, res) => {
+  // Tools all read from Postgres, so wait for the initial connection rather
+  // than failing with an opaque error on a cold start.
+  await dbInit;
+  if (!dbReady) {
+    res.status(503).json({ error: `Database unavailable: ${dbError ?? "unknown"}` });
+    return;
+  }
+
   try {
     const sessionId = req.headers["mcp-session-id"] as string | undefined;
 
@@ -207,8 +235,9 @@ app.delete("/mcp", async (req, res) => {
 });
 
 const PORT = parseInt(process.env.PORT || "3000", 10);
-app.listen(PORT, () => {
-  console.log(`🚀 Commerce Ops MCP Server running on port ${PORT}`);
-  console.log(`   Health: http://localhost:${PORT}/health`);
-  console.log(`   MCP:    http://localhost:${PORT}/mcp`);
+// Bind 0.0.0.0 so the container is reachable from outside, not just loopback.
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`Commerce Ops MCP Server listening on 0.0.0.0:${PORT}`);
+  console.log(`   Health: /health`);
+  console.log(`   MCP:    /mcp`);
 });
