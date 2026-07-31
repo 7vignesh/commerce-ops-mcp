@@ -2,12 +2,20 @@ import pg from "pg";
 
 const { Pool } = pg;
 
+const CONNECTION_STRING =
+  process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/commerce_ops";
+
+// Managed Postgres requires TLS; a local instance generally does not offer it.
+// Keyed off the host rather than the provider name so swapping providers does
+// not silently disable SSL.
+const isLocal = /@(localhost|127\.0\.0\.1|\[::1\])[:/]/.test(CONNECTION_STRING);
+
 const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || "postgresql://postgres:postgres@localhost:5432/commerce_ops",
+  connectionString: CONNECTION_STRING,
   max: 10,
   idleTimeoutMillis: 30000,
   connectionTimeoutMillis: 10000,
-  ssl: process.env.DATABASE_URL?.includes("supabase") ? { rejectUnauthorized: false } : undefined,
+  ssl: isLocal ? undefined : { rejectUnauthorized: false },
 });
 
 // Test connection on startup
