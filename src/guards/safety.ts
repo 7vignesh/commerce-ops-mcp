@@ -88,6 +88,11 @@ export async function processRefund(
   reason: string,
   idempotencyKey: string
 ): Promise<{ success: boolean; message: string }> {
+  // Serialise concurrent refunds for this order. Any competing transaction
+  // blocks here until this one commits or rolls back, so the idempotency
+  // check below cannot be raced.
+  await client.query("SELECT id FROM payments WHERE order_id = $1 FOR UPDATE", [orderId]);
+
   // Check idempotency — if this key already exists, return existing result
   const existing = await client.query(
     "SELECT id, details FROM action_log WHERE idempotency_key = $1",
