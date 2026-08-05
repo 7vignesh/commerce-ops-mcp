@@ -9,6 +9,7 @@
     "start": "node dist/server.js",
     "seed": "tsx src/data/seed.ts",
     "test": "vitest run",
+    "test:local": "docker compose up -d --wait && cross-env DATABASE_URL=postgresql://test:test@localhost:5433/commerce_ops_test vitest run; docker compose down -v",
     "test:watch": "vitest"
   },
   "dependencies": {

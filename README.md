@@ -214,7 +214,25 @@ surfacing as a generic platform 502.
 
 ## Tests
 
+### Credential-free local path (recommended for reviewers)
+
+Requires Docker. No credentials, accounts, or environment variables needed:
+
 ```bash
+# Linux / macOS
+./scripts/test-local.sh
+
+# Windows
+scripts\test-local.cmd
+```
+
+This starts a disposable PostgreSQL container on port 5433, runs the full
+suite against it, and tears it down afterwards. Nothing persists.
+
+### Against an existing database
+
+```bash
+# Set DATABASE_URL to any PostgreSQL instance, then:
 npm test
 ```
 

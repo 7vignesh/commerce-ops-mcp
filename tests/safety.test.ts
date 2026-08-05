@@ -1,4 +1,7 @@
-import "dotenv/config";
+import dotenv from "dotenv";
+// Load .env.test if present (local isolated Postgres), fall back to .env
+dotenv.config({ path: ".env.test" });
+dotenv.config();
 import { beforeAll, afterAll, beforeEach, describe, it, expect } from "vitest";
 import pool, { initializeDatabase, query, queryOne, transaction } from "../src/db/index.js";
 import { issueRefund } from "../src/tools/issue-refund.js";
